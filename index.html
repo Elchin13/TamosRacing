@@ -102,6 +102,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .seedrow{font-size:12px;color:#8f9bb0;display:flex;gap:6px;align-items:center}
 .seedrow input{background:#0e131b;border:1px solid #3a475f;color:#fff;border-radius:6px;padding:4px 8px;width:110px;font-family:inherit}
 .stratrow td{font-size:12px}
+.alm{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.alm .card{padding:14px;font-size:13px;line-height:1.45}.alm h3{margin:0;color:#fff;font-size:17px}.alm .ti{color:#ffd24a;font-weight:700;margin:2px 0}.alm .yr{font-size:11px;color:#8f9bb0;margin-bottom:6px}.alm ul{margin:6px 0 0;padding-left:18px;color:#9fb4d1}
 </style>
 </head>
 <body>
@@ -123,6 +124,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 <div class="ov" id="menu"><div class="box"></div></div>
 <div class="ov" id="tracks"><div class="box"></div></div>
 <div class="ov" id="intro"><div class="box"></div></div>
+<div class="ov" id="alm"><div class="box"></div></div>
 <div class="ov" id="res"><div class="box"></div></div>
 
 <script>
@@ -213,7 +215,13 @@ const TRACKS=[
   ctrl:[[900,400],[1500,330],[2100,380],[2500,600],[2550,950],[2250,1200],[2300,1500],[2000,1750],[1500,1700],[1200,1450],[800,1550],[450,1300],[500,900],[700,650]]},
  {id:112,name:'112 кабинет',laps:35,W:135,grip:1.05,vmaxK:1,wearK:.85,errK:.6,bumpy:0,draft:1.05,passK:1,diff:1,ovt:3,spd:3,
   desc:'Лёгкая и спокойная, с качественным асфальтом. Идеально, чтобы смотреть чистую борьбу без сюрпризов.',
-  ctrl:[[700,400],[1400,330],[2100,350],[2600,550],[2750,900],[2550,1250],[2150,1400],[1800,1250],[1450,1350],[1500,1650],[1100,1800],[650,1650],[450,1250],[500,800]]}
+  ctrl:[[700,400],[1400,330],[2100,350],[2600,550],[2750,900],[2550,1250],[2150,1400],[1800,1250],[1450,1350],[1500,1650],[1100,1800],[650,1650],[450,1250],[500,800]]},
+ {id:50,name:'Спортзал',ptsK:2,laps:50,W:140,grip:1.04,vmaxK:1.05,wearK:.9,errK:.6,bumpy:0,draft:1.35,passK:1.3,diff:2,ovt:5,spd:5,
+  desc:'Гладкая, быстрая, широкая и очень качественная. Куча динамики и обгонов, а закрывает круг знаменитый широкий поворот «Турники».',
+  ctrl:[[600,400],[1400,340],[2200,340],[2900,380],[3250,560],[3300,900],[3100,1150],[2600,1180],[2100,1100],[1700,1180],[1350,1300],[1150,1550],[900,1750],[450,1650],[230,1300],[220,850],[340,540]]},
+ {id:55,name:'Актовый Зал',ptsK:2,laps:55,W:100,grip:.97,vmaxK:.98,wearK:1.1,errK:1.15,bumpy:.05,draft:.9,passK:.8,diff:5,ovt:2,spd:3,
+  desc:'ФИНАЛ СЕЗОНА. Сложная, длинная и размеренная: чистый скилл, ум и скорость. Здесь не отсидеться — только ровный, умный темп до последнего круга.',
+  ctrl:[[500,300],[1200,260],[2000,280],[2700,260],[3100,420],[3200,720],[2900,900],[2400,820],[2000,700],[1600,780],[1500,1000],[1850,1150],[2300,1100],[2700,1250],[2900,1500],[2600,1750],[2100,1700],[1800,1500],[1400,1450],[1000,1700],[600,1800],[250,1600],[300,1250],[650,1150],[800,900],[450,780],[250,550]]}
 ];
 // ===TRACKS_END===
 
@@ -626,6 +634,7 @@ class World{
     const rem=this.laps-c.lapIdx;                      // кругов осталось, включая текущий
     const must=c.used.length<2;
     if(rem<=2&&!(must&&rem>=2))return;
+    if(!must&&rem<=Math.max(4,Math.round(this.laps*.15))&&c.tyreW+rem/this.lifeEff(c,c.comp)*1.0<1.2)return;
     const hasNext=c.stintIdx<c.plan.length-1;
     const life=this.lifeEff(c,c.comp),dw=1/life;
     const wEnd=c.tyreW+dw*1.0;
@@ -735,14 +744,15 @@ World.prototype.startService=function(c){
 // вероятность командного приказа (в секунду) и допустимость
 World.prototype.teamOrderProb=function(c,mate,freeV){
   const tm=TEAMS[c.team],plan=tm.plan;
-  if(this.laps-c.lapNow<=2)return 0;
+  if(this.laps-c.lapNow<=4||c.lapNow<4)return 0;
   const adv=freeV-mate.v;
-  if(adv<4)return 0;
+  if(adv<9)return 0;
+  for(const o of this.cars){if(o===c||o===mate||o.gone||o.dnf||o.team===c.team)continue;const ds=this.normDs(mate.dist,o.dist);if(ds>0&&ds<CFG.CAR_L+60)return 0;}
   // угроза от соперника, который сидит на хвосте у напарника
   for(const o of this.cars){if(o===c||o===mate||o.gone||o.dnf||o.team===c.team)continue;const ds=this.normDs(o.dist,mate.dist);if(ds>0&&ds<CFG.CAR_L+34&&Math.abs(o.d-mate.d)<CFG.CAR_W*2)return 0;}
-  if(tm.lead===c.D.key)return plan*.38*(.35+.65*clamp(adv/16,0,1));
-  if(tm.lead===null)return adv>14?plan*.22*clamp(adv/30,0,1):0;
-  return adv>30?plan*.04:0;
+  if(tm.lead===c.D.key)return plan*.14*(.35+.65*clamp(adv/20,0,1));
+  if(tm.lead===null)return adv>18?plan*.08*clamp(adv/30,0,1):0;
+  return adv>40?plan*.015:0;
 };
 World.prototype.control=function(c,dt){
   const T=this.T,L=T.L,D=c.D,st=c.st,pt=c.pit,rng=this.rng,CL=CFG.CAR_L,CW=CFG.CAR_W,DLIM=CFG.W/2-11;
@@ -754,6 +764,7 @@ World.prototype.control=function(c,dt){
   const rp=this.relPos(c.dist);
   const S=this.sc,scOn=isRace&&S.state!=='off';
   c.inPit=pt.ph>0;
+  if(pt.ph>0)c.ghostT=2.5;else if(c.ghostT>0)c.ghostT-=dt;
   const wreck=this.yellow.t>0?this.yellow.wreck:null;
   let yellowZone=false;
   if(isRace&&!scOn&&wreck&&!wreck.gone){const ds=this.normDs(c.dist,wreck.dist);if(ds>-30&&ds<420)yellowZone=true;}
@@ -788,11 +799,11 @@ World.prototype.control=function(c,dt){
   const pressure=(blk&&blk.gap<60)||(chaser&&chaser.gap<45);
   if(pressure)P*=1+(D.clutch-.5)*.012;
   if(this.laps-c.lapNow<=4)P*=1+D.clutch*.004;
-  if(st.pass)P*=1+.008*D.ovt;else if(chaser&&chaser.gap<40)P*=1+.006*D.def;
+  if(st.pass)P*=1+.014*D.ovt;else if(chaser&&chaser.gap<40)P*=1+.006*D.def;
   if(this.mode==='quali')P*=c.qBoost;
   // слипстрим
   let draft=0;
-  if(blk&&blk.gap>-6&&blk.gap<55)draft=(1-Math.max(0,blk.gap)/55)*.07*T.draft*(.75+.5*D.iq)*clamp(1-(Math.abs(blk.dd)-4)/18,0,1);
+  if(blk&&blk.gap>-6&&blk.gap<80)draft=(1-Math.max(0,blk.gap)/80)*.11*T.draft*(.75+.5*D.iq)*clamp(1-(Math.abs(blk.dd)-4)/18,0,1);
   let gcor=c.gBase*P;
   if(blk&&blk.gap<38&&Math.abs(blk.dd)<CW*1.2)gcor*=1-.035*(1-Math.max(0,blk.gap)/38);
   const vtop=CFG.VMAX*T.vmaxK*c.vtopBase*P*(1+draft);c.vtopEff=vtop;
@@ -805,6 +816,7 @@ World.prototype.control=function(c,dt){
   c.over=c.v/Math.max(30,T.at(T.vprof,s)*gcor*lineF);
   c.wearRate=(.85+.3*Math.min(1.3,c.over))*(blk&&blk.gap<35?1.12:1)*(st.pass?1.12:1);
   if(st.hesT>0)vT*=.8;
+  if(isRace&&this.raceT>0)vT*=1-.05*clamp((16-this.raceT)/16,0,1);
   if(st.mistT>0){st.mistT-=dt;vT*=st.mistV;if(st.mistKind==='lock'&&this.tick%4===0)this.fx.push({type:'smoke',x:c.x,y:c.y});}
   if(c.off)vT*=Math.abs(c.d)>CFG.W/2+14?.35:.62;
   // ошибки
@@ -813,13 +825,14 @@ World.prototype.control=function(c,dt){
     rate*=1+(blk&&blk.gap<35?.7:0)+(st.pass?.5*D.risk+.3:0)+(st.defT>0?.4:0);
     if(c.tyreW>.85)rate*=1+(c.tyreW-.85)*4;
     if(c.over>1.04)rate*=1+(c.over-1)*30;
+    if(this.raceT<16)rate*=.35;
     if(rng()<rate*dt)this.mistake(c);
   }
   if(st.spinT>0)vT=0;
   // ограничение по впереди идущему
   let cap=1e9;
   if(blk&&isRace){
-    const sg=7+11*D.caut+7*(1-D.risk);
+    const sg=5+8*D.caut+5*(1-D.risk)+(this.raceT<12?8:0);
     const f=clamp((Math.abs(blk.dd)-CW*.95)/(CW*.5),0,1);
     if(f<1){const ov=blk.o.v,ge=blk.gap-sg;let al=ge>0?ov+Math.sqrt(2*CFG.BRAKE_MAX*.55*ge):ov+ge*2.2;al=Math.max(0,al);cap=lerp(al,Math.max(vT,al),f);}
   }
@@ -860,8 +873,8 @@ World.prototype.control=function(c,dt){
     if(!st.pass&&!st.yield&&mateOk&&blk&&blk.o===mate&&blk.gap<70&&!mate.st.yield&&this.t>=(this.orderCool[c.team]||0)){
       st.stuckT+=dt;
       const pr=this.teamOrderProb(c,mate,freeV);
-      if(pr>0&&st.stuckT>1.4&&rng()<pr*dt){
-        this.orderCool[c.team]=this.t+40;st.stuckT=0;
+      if(pr>0&&st.stuckT>3&&rng()<pr*dt){
+        this.orderCool[c.team]=this.t+150;st.stuckT=0;
         const refuse=rng()<(1-mate.D.loyal)*.5*(TEAMS[c.team].lead===mate.D.key?2:1);
         if(refuse){this.say('order',mate,'eng',2,{n:mate.name,m:c.name},1);this.sayLater(2,'letby',mate,'drv',2,null,.7);this.log('Командный приказ: '+mate.name+' не торопится пропускать '+c.name,'info');}
         else{
@@ -883,15 +896,15 @@ World.prototype.control=function(c,dt){
       else if(p.t<=0||real>230||p.o.gone||p.o.dnf){st.pass=null;st.passCd=1;}
       if(st.pass){let sd=p.side;if(p.feint>0){p.feint-=dt;sd=-sd;}tgt=clamp(p.o.d+sd*(CW+p.gl),-DLIM,DLIM);}
     }else{
-      const range=((55+75*D.aggr)*(1-.3*D.caut)+(st.burstT>0?30:0))*(.75+.25*T.passK);
-      if(blk&&blk.gap<range&&st.passCd<=0&&!blk.o.dnf&&!blk.o.inPit&&(Math.abs(k)<.0035||D.chaos>.5)){
+      const range=((70+95*D.aggr)*(1-.3*D.caut)+(st.burstT>0?30:0))*(.75+.25*T.passK);
+      if(blk&&blk.gap<range&&st.passCd<=0&&this.raceT>5&&!blk.o.dnf&&!blk.o.inPit&&(Math.abs(k)<.0048||D.chaos>.5)){
         st.followT+=dt;
         const same=blk.o.team===c.team;
-        const thr=(.25+1.8*D.caut+(1-D.aggr)*1+(st.burstT>0?-.4:0))/Math.max(.5,T.passK)+(same?1.6:0);
-        const can=freeV>blk.o.v+2+(same?5:0);
+        const thr=.6*(.25+1.8*D.caut+(1-D.aggr)*1+(st.burstT>0?-.4:0))/Math.max(.5,T.passK)+(same?1.6:0);
+        const can=freeV>blk.o.v-1+(same?5:0);
         if(st.followT>thr&&(can||rng()<D.aggr*dt*.6*(same?.3:1))){
           const sd=this.pickSide(c,blk);
-          if(sd){st.pass={o:blk.o,side:sd.side,gl:sd.gl+(same?3:0),t:2.6+1.4*rng(),done:0,lb:1+(same?0:D.risk*.04*(.4+.8*rng())),feint:(!same&&D.chaos>.3&&rng()<D.chaos*.5)?.3:0};st.followT=0;}
+          if(sd){st.pass={o:blk.o,side:sd.side,gl:sd.gl+(same?3:0),t:3.4+1.6*rng(),done:0,lb:1+(same?0:D.risk*.06*(.4+.8*rng())),feint:(!same&&D.chaos>.3&&rng()<D.chaos*.5)?.3:0};st.followT=0;}
           else st.passCd=.7;
         }
       }else st.followT=Math.max(0,st.followT-dt*.5);
@@ -937,7 +950,7 @@ World.prototype.control=function(c,dt){
       if(pt.svc<=0){
         let unsafe=false;
         for(const o of this.cars){if(o===c||o.gone||!o.pit.ph||o.pit.ph===2)continue;const ds=this.normDs(o.dist,c.dist);if(ds>-110&&ds<45&&o.v>20&&Math.abs(o.d-this.pitD1)<20){unsafe=true;break;}}
-        if(unsafe&&pt.hold<3)pt.hold+=dt;else{this.completeStop(c);pt.ph=3;pt.hold=0;}
+        if(false)pt.hold+=dt;else{this.completeStop(c);pt.ph=3;pt.hold=0;}
       }
     }else if(pt.ph===3){
       pitTgt=rp<pt.boxPos+26?this.pitD2:this.pitD1;
@@ -947,7 +960,7 @@ World.prototype.control=function(c,dt){
       if(!pt.rel){
         let unsafe=false;
         for(const o of this.cars){if(o===c||o.gone||o.pit.ph||o.dnf)continue;const ds=this.normDs(o.dist,c.dist);if(ds>-380&&ds<30&&o.v>60){unsafe=true;break;}}
-        if(unsafe&&pt.hold<5){pt.hold+=dt;pitV=0;pitTgt=this.pitD1;}else pt.rel=1;
+        if(false){pt.hold+=dt;pitV=0;pitTgt=this.pitD1;}else pt.rel=1;
       }
       if(pt.rel){
         if(Math.abs(c.d)<CFG.W/2-8&&rp>=this.PIT_LIM1-40||rp>this.PIT_LIM1+260){pt.ph=0;pt.rel=0;pt.hold=0;c.inPit=false;}
@@ -985,7 +998,7 @@ World.prototype.mistake=function(c){
   const st=c.st,D=c.D,rng=this.rng;
   c.stats.mistakes++;this.stats.errs++;
   if(this.mode==='race'&&!c.inPit&&!c.dnf){
-    const risk=.7*(.002+.03*Math.pow(1-D.cons,2)+.012*D.risk)*this.T.errK*(1+Math.max(0,c.over-1.03)*8)*(c.tyreW>.9?1.4:1);
+    const risk=(this.raceT<16?.3:1)*.7*(.002+.03*Math.pow(1-D.cons,2)+.012*D.risk)*this.T.errK*(1+Math.max(0,c.over-1.03)*8)*(c.tyreW>.9?1.4:1);
     if(rng()<risk){this.incident(c,'crash','Ошибка в повороте');return;}
   }
   const r=rng();
@@ -1091,9 +1104,9 @@ World.prototype.integrate=function(c,dt){
 World.prototype.collisions=function(){
   const cars=this.cars,T=this.T,L=T.L,CL=CFG.CAR_L,CW=CFG.CAR_W;
   for(let i=0;i<cars.length;i++){
-    const a=cars[i];if(a.gone||a.dnf)continue;
+    const a=cars[i];if(a.gone||a.dnf||a.pit.ph>0)continue;
     for(let j=i+1;j<cars.length;j++){
-      const b=cars[j];if(b.gone||b.dnf)continue;
+      const b=cars[j];if(b.gone||b.dnf||b.pit.ph>0)continue;
       let ds=b.dist-a.dist;ds-=Math.round(ds/L)*L;
       if(Math.abs(ds)>CL)continue;
       const k=T.at(T.ks,a.s),real=ds*Math.max(.4,1-.5*(a.d+b.d)*k),dd=b.d-a.d;
@@ -1121,7 +1134,7 @@ World.prototype.collisions=function(){
         a.tyreW+=.01;b.tyreW+=.01;
         this.say('contact',a,'drv',1,{n:b.name},.6);this.say('contact',b,'drv',1,{n:a.name},.6);
         if(rv>62&&this.phase==='race'&&this.sc.state==='off'){
-          if(this.rng()<.3)this.incident(rear,'crash','Столкновение с '+front.name);
+          if(this.rng()<(this.raceT<16?.08:.3))this.incident(rear,'crash','Столкновение с '+front.name);
           else{rear.st.spinT=1.4;front.st.mistT=1;front.st.mistV=.85;front.st.mistDrift=30;front.st.mistKind='wide';}
         }
       }
@@ -1207,8 +1220,10 @@ World.prototype.finalize=function(){
   dnf.sort((a,b)=>b.lapIdx-a.lapIdx||b.dist-a.dist);
   const res=[];let win=null;
   fin.forEach((c,i)=>{const total=c.raceTime+c.penalty;if(!win)win=total;res.push({c,pos:i+1,total,laps:c.finLaps,down:fin[0].finLaps-c.finLaps,gap:total-win,pts:pts[i]||0,dnf:false});});
+  const PK=(this.T.def&&this.T.def.ptsK)||1;
   dnf.forEach((c,i)=>res.push({c,pos:fin.length+i+1,total:0,laps:c.lapIdx,down:0,gap:0,pts:0,dnf:true}));
   if(this.bestLapCar){const r=res.find(x=>x.c===this.bestLapCar);if(r&&!r.dnf&&r.pos<=10)r.pts+=1;}
+  if(PK>1)res.forEach(r=>{r.pts*=PK;});
   this.results=res;this.log('Гонка завершена','lead');
 };
 function runQuali(T,seed,form){
@@ -1299,7 +1314,7 @@ let dir={pair:null,hold:0,seenInc:null,focusT:0};
 const parts=[];
 let rowEls=[],hudT=0,shownResults=false,doneAt=0,curDef=null,inMenu=true;
 
-function hideAll(){['menu','tracks','intro','res'].forEach(i=>$(i).style.display='none');}
+function hideAll(){['menu','tracks','intro','res','alm'].forEach(i=>$(i).style.display='none');}
 function busSVG(){
   return '<svg class="bus" viewBox="0 0 420 130"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#d9dee6"/></linearGradient></defs>'
    +'<ellipse cx="210" cy="118" rx="190" ry="9" fill="#0006"/>'
@@ -1312,14 +1327,16 @@ function busSVG(){
    +'<circle cx="300" cy="106" r="17" fill="#15171a"/><circle cx="300" cy="106" r="8" fill="#9aa3b0"/>'
    +'<text x="185" y="72" font-size="30" font-weight="900" text-anchor="middle" fill="#ef3b3b" font-family="system-ui">SCHOOL BUS</text></svg>';
 }
+const ALM=[["Куаныш", "#ef3b3b", "4-кратный чемпион (2019, 2020, 2021, 2023)", "Дебют 2015 · красная команда", "Главная звезда эпохи. Рекордсмен по победам за сезон, по очкам и победам за карьеру и по поул-позициям. Ворвался в элиту в 2019 и взял три титула подряд, повторив достижение Зелёной Шляпы, затем добавил 2023. Мастер обгона, но слабоват на старте.", ["2019–2021: «хет-трик» — три чемпионства подряд.", "2023: дуэль с Айбеком, решившаяся только в последней гонке.", "Рекорды по победам, очкам и поул-позициям."]], ["Зеленая Шляпа", "#22c55e", "3-кратный чемпион (2015, 2016, 2017)", "Дебют 2015 · всю карьеру зелёная команда", "Самый первый чемпион в истории и первый, кто взял два и более титула подряд (позже это повторил Куаныш). Рекордсмен по очкам за сезон и по подиумам за сезон и за карьеру. Самый пожилой гонщик пелотона: его соперниками в прайме были Старый Весельчак и Бигги. Близок к завершению карьеры, преемник — Айбек.", ["2015: первый титул в истории Гран-при.", "2015–2017: три чемпионства подряд — эра Зелёной Шляпы.", "Классические дуэли со Старым Весельчаком."]], ["Айбек", "#22c55e", "Чемпион 2024", "Дебют 2020 · зелёная команда", "Один из самых молодых гонщиков и преемник Зелёной Шляпы. Был на волоске от титула в 2020 и 2023, когда всё решала последняя гонка. В 2024 взял долгожданное чемпионство, вернувшись, когда все думали, что он сломался. Машина — самая технологичная в пелотоне.", ["2020: дебют и борьба за титул до финального этапа.", "2023: снова второй, снова в последней гонке.", "2024: камбэк и первое чемпионство."]], ["Бигги", "#a45cf0", "Титулов нет", "Дебют 2015 · всю карьеру фиолетовая команда", "Печально известен как «вечно третий»: в 8 из 11 сезонов финишировал третьим. Третий по очкам за карьеру. Один из самых стабильных гонщиков в истории и единственный, кто ни разу не опускался ниже 200 очков за сезон. Крепкая оборона и железные нервы.", ["Восемь третьих мест в чемпионате из одиннадцати.", "Ни одного сезона ниже 200 очков.", "Соперник Зелёной Шляпы в расцвете."]], ["Старый Весельчак", "#a45cf0", "Чемпион 2018", "Дебют 2015 · фиолетовая команда", "Однократный чемпион и второй по возрасту гонщик. Известен хаотичными обгонами, на грани фола, и принципиальным соперничеством с Зелёной Шляпой. Победа 2018 года прервала серию титулов соперника.", ["2018: титул, прервавший владычество Зелёной Шляпы.", "Опасные обгоны на последнем круге — его фирменный почерк."]], ["Гасырлам", "#ff8a1f", "Чемпион 2022", "Дебют 2015 · красная 2015–2021 · оранжевая с 2022", "Красная команда заменила его Азой в 2021 году — он не ожидал этого, но не расстроился и в первом же сезоне за оранжевых (2022) стал чемпионом.", ["2021: скандальная замена в красной команде.", "2022: чемпионство в первом сезоне за новую команду.", "Первый, кого заменили в команде ради дебютанта."]], ["Аза", "#ef3b3b", "Титулов нет", "Дебют 2021 · красная команда", "Дебютант 2021 года, скандально заменивший Гасырлама, хотя ожидалось, что тот останется. Лучший сезон — 2023, третье место в чемпионате. Отличный старт, но иногда чересчур осторожен в обгонах.", ["2021: дебют вместо Гасырлама — громкая смена состава.", "2023: бронза чемпионата, лучший сезон."]], ["Высокий", "#ff8a1f", "Титулов нет", "Дебют 2017 · всю карьеру оранжевая команда", "Выгрызает позиции напором и редкими порывами, несмотря на слабейшую машину пелотона. Верный командный игрок, всегда готов помочь напарнику.", ["Несколько поразительных рывков с последних мест."]], ["Шофер", "#2f8cff", "Титулов нет", "Дебют 2015 · всю карьеру синяя команда", "Король одного круга. Лучший сезон — 2022: с новой машиной боролся за титул до конца и занял третье место.", ["2022: бронза и борьба за чемпионство до финала."]], ["Изгой", "#2f8cff", "Титулов нет", "Дебют 2015 · всю карьеру синяя команда", "Одновременно гонщик и инженер команды. Лучший сезон — 2022: запрыгнул в топ-5 чемпионата.", ["2022: впервые в топ-5 по итогам сезона."]], ["Бежевый", "#ff8a1f", "Ушедший", "2015–2017 · оранжевая команда", "Выступал за оранжевых с 2015 по 2017 год, после чего покинул команду по её решению.", []], ["Боксёр", "#ff8a1f", "Ушедший", "2015–2021 · оранжевая команда", "Ушёл из оранжевой команды в 2021 по собственным причинам, но пообещал вернуться.", []], ["Зелёная Шапка", "#22c55e", "Ушедший", "2015–2020 · зелёная команда", "Уволен зелёной командой в 2020 году; его место занял дебютант Айбек.", []]];
+function showAlm(){hideAll();inMenu=true;let h='<div class="topbar"><div><h1>Альманах гонщиков</h1><p class="sub">Чемпионы: Зелёная Шляпа ×3, Старый Весельчак, Куаныш ×4, Гасырлам, Айбек. На финальных трассах (Спортзал, Актовый Зал) очки ×2.</p></div><button id="aBack">← В меню</button></div><div class="alm">';ALM.forEach(a=>{h+='<div class="card" style="border-top:3px solid '+a[1]+'"><h3>'+a[0]+'</h3><div class="ti">'+a[2]+'</div><div class="yr">'+a[3]+'</div>'+a[4]+(a[5].length?'<ul>'+a[5].map(x=>'<li>'+x+'</li>').join('')+'</ul>':'')+'</div>';});h+='</div>';const b=$('alm').querySelector('.box');b.innerHTML=h;$('alm').style.display='flex';$('aBack').onclick=showMenu;}
 function showMenu(){
   hideAll();inMenu=true;
   const cont=world&&world.phase!=='grid'&&!world.done;
   $('menu').querySelector('.box').innerHTML='<div class="logo"><small>СИМУЛЯТОР ГОНОК</small>ГРАН-ПРИ<br>ШКОЛЬНЫХ АВТОБУСОВ</div>'+busSVG()
    +'<p>10 гонщиков, 5 команд, белые школьные автобусы. Квалификация, шины и пит-стопы, аварии и машина безопасности, командная игра и радио — всё решает ИИ. Вы смотрите гонку сверху.</p>'
-   +'<div class="btns">'+(cont?'<button id="mCont" class="go">↩ Продолжить гонку</button>':'')+'<button id="mStart" class="go">▶ Выбрать трассу</button></div>';
+   +'<div class="btns">'+(cont?'<button id="mCont" class="go">↩ Продолжить гонку</button>':'')+'<button id="mStart" class="go">▶ Выбрать трассу</button><button id="mAlm">📖 Альманах гонщиков</button></div>';
   if(cont)$('mCont').onclick=()=>{hideAll();inMenu=false;};
-  $('mStart').onclick=showTracks;
+  $('mStart').onclick=showTracks;$('mAlm').onclick=showAlm;
   $('menu').style.display='flex';
 }
 function showTracks(){
